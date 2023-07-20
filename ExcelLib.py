@@ -2,17 +2,17 @@
 Available methods are the followings:
 [1] AutoFilter
 [2] ProtectSheet
-[3] ListValidation
-[4] CellStyle
+[3] Validation (Class)
+[4] CellStyle (Class)
 [5] CopySheet
 [6] get_filepaths
 
-Authors: Danusorn Sitdhirasdr <danusorn.s@kasikornbank.com>
+Authors: Danusorn Sitdhirasdr <danusorn.si@gmail.com>
 versionadded:: 11-07-2023
 
 '''
 import pandas as pd, numpy as np, os
-from datetime import datetime
+from datetime import datetime, timedelta
 from openpyxl import load_workbook, Workbook
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.styles import (PatternFill, Border, Side, 
@@ -25,56 +25,126 @@ from itertools import product
 
 __all__ = ["AutoFilter",
            "ProtectSheet", 
-           "ListValidation",
+           "Validation",
            "CellStyle", 
            "CopySheet", 
            "get_filepaths"]
 
-def ListValidation(sh, source, coord=(1,1), 
-                   offset=(0,0), kwargs=None):
+class Validation:
     
     '''
-    Add list validation to range.
-
+    Add validation to range.
+    
     Parameters
     ----------
-    sh : openpyxl Worksheet
-        Excel worksheet.
+    type : str, default=None
+        Specify type of validation. The supported types are as follows:
+        "whole"      : to restrict cell to accept only whole numbers.
+        "decimal"    : to restrict cell to accept only decimal numbers.
+        "list"       : to pick data from the drop-down list.
+        "date"       : to restrict cell to accept only date.
+        "time"       : to restrict cell to accept only time.
+        "textlength" : to restrict the length of the text.
+        "custom"     : for custom formula.
+
+    operator : str, default=None
+        Specify the operator. This is relevant when type is not "list"
+        or "customr". The supported operators are "lessThanOrEqual", 
+        "equal", "greaterThan", "notEqual", "lessThan", "between", 
+        "greaterThanOrEqual", and "notBetween".
+    
+    formula1 : str, int, float, default=None
+        Valid input for cell e.g. "a,b,c" or 100 or "=ISNUMBER(A1)" . 
+        If operator is either "between" or "notBetween", formula1 
+        becomes a lower bound. 
         
-    source : str, default=""
+        Input for date and time "%d/%m/%Y"
         
-    coord : (int,int), default=(1,1)
-        Starting cell coordinate e.g. (1,1) is "A1".
         
-    offset : (int,int), default=(0,0)
-        The number of rows, and columns to be added.
+    formula2 : str, int, float, default=None
+        An upper bound when operator is either "between" or 
+        "notBetween". 
+        
+    allow_blank : bool, default=True
+        If True, it allows cell to be blank.
         
     kwargs: dict, default=None
-        Other attributes i.e. 'error', 'errortitle', 'prompt', 
+        Other attributes e.g. 'error', 'errortitle', 'prompt', 
         and 'prompttitle'.
         
     References
     ----------
     [1] https://openpyxl.readthedocs.io/en/stable/styles.html
+    [2] https://openpyxl.readthedocs.io/en/latest/validation.html
+    [3] https://support.microsoft.com/en-us/office/apply-data-
+        validation-to-cells-29fecbcc-d1b9-42c1-9d76-eff3ce5f7249
         
     '''
-    # Create a data-validation object with list validation
-    source = source[:255].lstrip().rstrip()
-    dv = DataValidation(type="list", allow_blank=True, 
-                        formula1=f'"{source}"')
+    def __init__(self, type=None, operator=None, formula1=None, 
+                 formula2=None, allow_blank=True, kwargs=None):
+        
+        # Initialize parameters
+        self.input = {"date" : ("31/12/1899", "%d/%m/%Y", "days", 1), 
+                      "time" : ("00:00:00", "%H:%M:%S", "seconds", 1/(24*3600))}
+        
+        # Convert inputs for date & time
+        if type == "date":
+            formula1 = int(FindDiff(*((formula1,) + self.input[type]))) + 1
+            formula2 = int(FindDiff(*((formula2,) + self.input[type]))) + 1
+        if type == "time":
+            formula1 = round(FindDiff(*((formula1,) + self.input[type])), 15)
+            formula2 = round(FindDiff(*((formula2,) + self.input[type])), 15)
+        elif type=="list": 
+            formula1 = formula1[:255].lstrip().rstrip()
+            formula1 =f'"{formula1}"'
+        elif type=="custom":
+            formula1 =f'"{formula1}"'
+        else: pass
+        
+        # Create data validation
+        self.dv = DataValidation(type=type, 
+                                 operator=operator,
+                                 formula1=formula1,
+                                 formula2=formula2,
+                                 allow_blank=allow_blank)
+            
+        # Optionally set a custom message
+        if isinstance(kwargs, dict):
+            for key in kwargs.keys():
+                setattr(self.dv, key, kwargs[key])
 
-    # Optionally set a custom message
-    attrs = ["error", "errortitle", "prompt", "prompttitle"]
-    if isinstance(kwargs, dict):
-        for key in set(attrs).intersection(kwargs.keys()):
-            setattr(dv, key, kwargs[key])
-    
-    # Add the data-validation object to designated cell
-    cell0 = sh.cell(*coord).coordinate
-    cell1 = sh.cell(coord[0] + max(offset[0], 0), 
-                    coord[1] + max(offset[1], 0)).coordinate
-    dv.add(f"{cell0}:{cell1}")
-    sh.add_data_validation(dv)
+    def apply(self, sh, coord=(1,1), offset=(0,0)):
+        
+        '''
+        Transform designated cell(s) according to validation format.
+        
+        Parameters
+        ----------
+        sh : openpyxl Worksheet
+            Excel worksheet.
+
+        coord : (int,int), default=(1,1)
+            Starting cell coordinate e.g. (1,1) is "A1".
+
+        offset : (int,int), default=(0,0)
+            The number of rows, and columns to be added.
+            
+        '''
+        # Add the data-validation object to designated cell
+        cell0 = sh.cell(*coord).coordinate
+        cell1 = sh.cell(coord[0] + max(offset[0], 0), 
+                        coord[1] + max(offset[1], 0)).coordinate
+        self.dv.add(f"{cell0}:{cell1}")
+        sh.add_data_validation(self.dv)
+
+def FindDiff(dt0, dt1, dtformat, attr, factor=1):
+    '''Find absolute difference between dt0 and dt1'''
+    if dt0 is not None:
+        diff = (datetime.strptime(dt0, dtformat)-
+                datetime.strptime(dt1, dtformat))
+        try: return abs(getattr(diff, attr, None)) * factor
+        except: return None
+    else: return None
 
 def UpdateDict(dict1:dict, dict2:dict):
     '''Update dictionary'''
@@ -153,10 +223,10 @@ class CellStyle:
         self.alignment = Alignment(**UpdateDict(self.alignment, kwargs))
         self.borderstyle = Border(**UpdateDict(self.borderstyle, kwargs))
     
-    def transform(self, sh, coord=(1,1), offset=(0,0)):
+    def apply(self, sh, coord=(1,1), offset=(0,0)):
         
         '''
-        Transform designated cell(s) according to predefined format.
+        Apply predefined format to designated cell(s).
         
         Parameters
         ----------
@@ -335,7 +405,7 @@ class Formulaformat(CellStyle):
                        "fill"   : self.pattern.fillstyle, 
                        "border" : self.pattern.borderstyle}
 
-    def transform(self, sh, coord=(1,1), offset=(0,0), formula=None):
+    def apply(self, sh, coord=(1,1), offset=(0,0), formula=None):
         
         '''
         Add conditional format (blank) to designated cell(s).
