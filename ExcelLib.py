@@ -329,7 +329,7 @@ def ProtectSheet(sh, labels=None, header=1, password="admin", protect=True):
     # Save and close workbook
     sh.sheet_view.showGridLines = False
 
-def CopySheet(wb, sheetname, new_wb=None):
+def CopySheet(wb, sheetname, new_sheetname=None, new_wb=None):
     
     '''
     Copy worksheet to new worksheet.
@@ -341,9 +341,13 @@ def CopySheet(wb, sheetname, new_wb=None):
         
     sheetname : str
         Name of worksheet to be copied.
+    
+    new_sheetname : str, default=None
+        Name for new worksheet. If None or same name is found, it 
+        defaults to "NEW_%Y%m%d%H%M%S".
         
     new_wb : openpyxl Workbook
-        New workbook. If None, new workbook is created.
+        New workbook. If None, it uses current workbook ("wb").
         
     References
     ----------
@@ -356,10 +360,13 @@ def CopySheet(wb, sheetname, new_wb=None):
     
     '''
     # Initiate parameters
+    def_name = f"NEW_{datetime.now():%Y%m%d%H%M%S}"
     sh = wb[sheetname]
-    new_wb = Workbook() if new_wb is None else new_wb
-    new_sh = new_wb.active
-    new_sh.title = sheetname
+    new_wb = wb if new_wb is None else new_wb
+    if ((new_sheetname is None) or 
+        (new_sheetname in new_wb.sheetnames)): 
+        new_sheetname = def_name
+    new_sh = new_wb.create_sheet(new_sheetname, 0)
 
     # copying the cell values from source 
     # excel file to destination excel file
