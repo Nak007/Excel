@@ -439,7 +439,7 @@ def ExtractMailContents(ReportGenerator, mails, source):
     
     # Mandatory fields
     fields = [c for _,c in ReportGenerator.params.cols["mandate"]]
-    logger.info(f"์Number of emails : {len(mails):,.0f}.")
+    logger.info(f"Number of emails : {len(mails):,.0f}.")
 
     for n in tqdm_notebook(mails.keys()):
         mail = namedtuple("Mail", mails[n].keys())(*mails[n].values())
@@ -480,7 +480,7 @@ def ExtractMailContents(ReportGenerator, mails, source):
                              f"<{mail.ReceivedTime}> does not "
                              f"have attachment(s).")
                 
-    t.value = "# of emails w/ attachments : {:,.0f}".format(n_valid)
+    t.value = "Number of emails w/ attachments : {:,.0f}".format(n_valid)
     return files
 
 def ApplySummaryFormats(path):
@@ -696,6 +696,10 @@ class SendReport:
     sheet_name2 : str, default="Recipients"
         Name of worksheet in "source" that contains list of recipients.
         
+    overwrite : bool, default=True
+        If True, it overwrites the file. This will result a loss of
+        data that is irrecoverable.
+        
     '''
     sheet_name = "Summary"
     usecols = ["SendTime","SendUser","SendComputer"]
@@ -807,7 +811,7 @@ class SendReport:
                 period = str(locales.loc[n,'period'])
                 period = "{:%d-%m-%Y}".format(datetime.strptime(period,"%Y%m%d"))
                 html = CreateHTML(self.rename[pattern], workbook, period)
-                OUTLOOK.SendMail(html, **{**self.kwargs,**{"display":diplay}})
+                OUTLOOK.SendMail(html, **{**self.kwargs,**{"display":display}})
                 logger.debug(f"์Notification email of <{workbook}> "
                              f"has been sent out successfully.")
         
