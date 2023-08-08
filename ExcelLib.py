@@ -134,6 +134,13 @@ class Validation:
         cell0 = sh.cell(*coord).coordinate
         cell1 = sh.cell(coord[0] + max(offset[0], 0), 
                         coord[1] + max(offset[1], 0)).coordinate
+        
+        # Remove previously added range(s)
+        while len(self.dv.ranges.ranges):
+            rng = self.dv.ranges.ranges[0].__str__()
+            self.dv.ranges.remove(rng)
+        
+        # Add new range
         self.dv.add(f"{cell0}:{cell1}")
         sh.add_data_validation(self.dv)
 

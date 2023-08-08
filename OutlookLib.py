@@ -62,6 +62,7 @@ def ReadMail(path, stop=None, start=None, days=100, sort=True):
         - "ReceivedTime" : Date & time at which the item was received
         - "CreationTime" : Creation time
         - "SentOn"       : Date & time at which the item was sent
+        - "Attachments"  : Attached files.
     
     '''
     # Initialize parameters
@@ -174,7 +175,7 @@ def SendMail(htmlbody, recipients, cc=None, subject=None,
     mail = outlook.CreateItem(0x0)
     
     # Add Subject
-    if isinstance(subject, str):
+    if not isinstance(subject, str):
         mail.Subject = "No Subject"
     else: mail.Subject = subject
     
@@ -194,7 +195,6 @@ def SendMail(htmlbody, recipients, cc=None, subject=None,
     if isinstance(kwargs, dict):
         for key,value in kwargs.items():
             setattr(mail, key, value)
-            print(key, value)
     
     # Display or Send mail
     if display: mail.Display()
