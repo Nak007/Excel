@@ -60,8 +60,7 @@ def hmac_hash(raw, key="admin", digestmod="sha1"):
     raw = raw.encode("utf-8")
     key = key.encode('utf-8')
     hashed = hmac.new(key, raw, digestmod=digestmod)
-    hashed = base64.encodebytes(hashed.digest())
-    hashed = hashed.decode('utf-8').rstrip('=\n')
+    hashed = hashed.hexdigest()
     return hashed
 
 class sum_namedtuple:
