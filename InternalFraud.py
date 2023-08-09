@@ -351,9 +351,6 @@ class AuditReport_base:
         wb.close()
         del wb
 
-def findword(s, regex):
-    return p[0] if len(p:=re.findall(regex,s))>0 else None
-
 def SaveExcel(attachments, workbook, saveas, fields, sheetname="Data"):
     
     '''
@@ -419,6 +416,9 @@ def SaveExcel(attachments, workbook, saveas, fields, sheetname="Data"):
             del wb
     return content
 
+def findword(s, regex):
+    return p[0] if len(p:=re.findall(regex,s))>0 else None
+
 def ExtractMailContents(ReportGenerator, mails, source):
     
     '''
@@ -448,6 +448,7 @@ def ExtractMailContents(ReportGenerator, mails, source):
             if re.findall(subj, mail.Subject.lower()).count(subj)>0:
                 
                 text = "\n".join([mail.Subject, mail.Body])
+                text = text[text.lower().find("subject"):]
                 content = {"period"       : (prd:=findword(text, "[0-9]{8}")),
                            "pattern"      : (pat:=findword(text, "[A-Z][0-9]{3}")),
                            "sender"       : mail.SenderName, 
@@ -823,7 +824,7 @@ class SendReport:
         
         return self
 
-def CreateHTML(folder, file, period):
+def CreateHTML(folder, file, period, rows):
     '''Create html of outlook email'''
     link  = ("https://kasikornbankgroup-my.sharepoint.com/personal/piti_p_kasikornbank_com/"
              "_layouts/15/onedrive.aspx?FolderCTID=0x012000FDB26412F17E3A4FB421F4C3C7F609F8&id="
@@ -837,6 +838,7 @@ def CreateHTML(folder, file, period):
              f"{font1} &emsp; นำส่งไฟล์ Pattern รอบ {period} ตามรายละเอียดด้านล่าง</p>", 
              f'{font1} &emsp; Pattern : <a href={link}>{folder}</a> </p>', 
              f"{font1} &emsp; File name : {file}</p>", 
+             f"{font1} &emsp; Number of records : {rows:,.0f}</p>", 
              f"{font0} <b>Best Regards</b>,</p>",
              f"{font0} Fraud Analytics"]
     return "<!DOCTYPE html><HTML><body>{}</body></HTML>".format("".join(html))
