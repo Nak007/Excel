@@ -343,8 +343,6 @@ class AuditReport_base:
         wb  = EXCEL.CopySheet(wb, "Data", self.sheetnames[0])
         sh1 = wb[self.sheetnames[0]]
         sh2 = wb.create_sheet(self.sheetnames[1], 1) 
-        row = find_lastrow(sh1, True)
-        col = find_lastcolumn(sh1, True)
         AuditSheet(sh1, self.params)
         ResultSheet(sh1, sh2, self.params)
         wb.save(saveas)
@@ -391,18 +389,21 @@ def SaveExcel(attachments, workbook, saveas, fields, sheetname="Data"):
     for name,obj in attachments.items():
         if os.path.splitext(name)[1].find(".xls")>-1:
             obj.SaveAsFile(path)
-            wb = load_workbook(path)
+            wb  = load_workbook(path)
+            row = find_lastrow(wb[sheetname], True)
+            col = find_lastcolumn(wb[sheetname], True)
+            
             content = {"sheets"  : ",".join(wb.sheetnames),
                        "n_sheets": len(sheets:=wb.sheetnames),
                        "hasdata" : (hasdata:=sheetname in sheets),
-                       "n_rows"  : (nr:=wb[sheetname].max_row if hasdata else 0),
+                       "n_rows"  : (nr:=wb[sheetname].max_row-1 if hasdata else 0),
                        "n_cols"  : (nc:=wb[sheetname].max_column if hasdata else 0), 
-                       "range"   : (rng:=f"A2:{get_column_letter(max(nc,1))}{max(nr,2)}"),
+                       "range"   : (rng:=f"A2:{get_column_letter(max(nc,1))}{max(nr+1,2)}"),
                        "n_points": (n_points:=len([n.value 
                                                    for n in np.r_[wb[sheetname][rng]] 
                                                    if n.value is not None]) 
                                     if hasdata else 0), 
-                       "p_point" : round(100*n_points/max((nr-1)*nc,1),2), 
+                       "p_point" : round(100*n_points/max(nr*nc,1),2), 
                        "p_match" : round(100*len([c.value for c in wb[sheetname]["1"] 
                                                   if c.value in fields])/len(fields) 
                                          if hasdata else 0,2),
@@ -447,10 +448,16 @@ def ExtractMailContents(ReportGenerator, mails, source):
         if (att:=mail.Attachments) is not None:
             if re.findall(subj, mail.Subject.lower()).count(subj)>0:
                 
-                text = "\n".join([mail.Subject, mail.Body])
+                text = " ".join([mail.Subject, mail.Body])
                 text = text[text.lower().find("subject"):]
-                content = {"period"       : (prd:=findword(text, "[0-9]{8}")),
-                           "pattern"      : (pat:=findword(text, "[A-Z][0-9]{3}")),
+                prd  = findword(text, "[0-9]{8}")
+                pat  = findword(text, "[A-Z][0-9]{3}")
+                if (prd is None) | (pat is None):
+                    prd = findword(mail.Subject, "[0-9]{8}")
+                    pat = findword(mail.Subject, "[A-Z][0-9]{3}")
+                
+                content = {"period"       : prd,
+                           "pattern"      : pat,
                            "sender"       : mail.SenderName, 
                            "to"           : mail.To, 
                            "cc"           : mail.CC, 
@@ -610,7 +617,7 @@ class AuditReport:
     datetime_format = "%d/%m/%Y %H:%M:%S"
     min_date = datetime.strptime("01/01/2022 00:00:00", datetime_format)
     str_date = "{:%d/%m/%Y %H:%M:%S}".format
-    sum_file  = "InternalFraud.xlsx"
+    sum_file = "InternalFraud.xlsx"
     
     def __init__(self,  source1:str, 
                  sheetname:str="Settings", 
@@ -808,9 +815,9 @@ class SendReport:
             
             # Sending out mail to notify relevant personnel
             if success & send:
-                period = str(locales.loc[n,'period'])
-                period = "{:%d-%m-%Y}".format(datetime.strptime(period,"%Y%m%d"))
-                html = CreateHTML(self.rename[pattern], workbook, period)
+                period, n_rows = locales.loc[n,['period','n_rows']].astype(int)
+                period = "{:%d-%m-%Y}".format(datetime.strptime(str(period),"%Y%m%d"))
+                html = CreateHTML(self.rename[pattern], workbook, period, n_rows)
                 OUTLOOK.SendMail(html, **{**self.kwargs,**{"display":display}})
                 logger.debug(f"์Notification email of <{workbook}> "
                              f"has been sent out successfully.")
